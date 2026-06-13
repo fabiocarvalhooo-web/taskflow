@@ -16,10 +16,13 @@ export default function ProjetosPage() {
   const [newProject, setNewProject] = useState({ name:"", description:"", color:COLORS[0], area:"" })
   const [editTask, setEditTask] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState(null)
 
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) setUserId(user.id)
     const [{ data: proj }, { data: tsk }] = await Promise.all([
       supabase.from("projects").select("*").order("created_at"),
       supabase.from("tasks").select("*").order("created_at"),
@@ -84,7 +87,7 @@ export default function ProjetosPage() {
     if (!newProject.name.trim()) return
     const { data } = await supabase.from("projects").insert({
       name:newProject.name, description:newProject.description||null,
-      color:newProject.color, area:newProject.area||null
+      color:newProject.color, area:newProject.area||null, owner_id:userId
     }).select().single()
     if (data) { setProjects((prev) => [...prev, data]); setExpanded((prev) => new Set([...prev, data.id])) }
     setShowNewProject(false); setNewProject({ name:"", description:"", color:COLORS[0], area:"" })
