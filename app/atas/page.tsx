@@ -3,14 +3,18 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import Nav from "@/components/Nav"
 
+interface Project { id: string; name: string; color?: string }
+interface Minute { id: string; project_id: string; title: string; created_at: string }
+interface MinuteItem { id: string; minute_id: string; tema: string; deliberacoes?: string; responsavel?: string; prazo?: string; observacao?: string; created_at: string }
+
 export default function AtasPage() {
-  const [projects, setProjects] = useState([])
-  const [minutes, setMinutes] = useState([])
-  const [items, setItems] = useState([])
-  const [expanded, setExpanded] = useState(new Set())
+  const [projects, setProjects] = useState<Project[]>([])
+  const [minutes, setMinutes] = useState<Minute[]>([])
+  const [items, setItems] = useState<MinuteItem[]>([])
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [showNew, setShowNew] = useState(false)
   const [newMinute, setNewMinute] = useState({ project_id:"", title:"" })
-  const [addingItem, setAddingItem] = useState(null)
+  const [addingItem, setAddingItem] = useState<string|null>(null)
   const [newItem, setNewItem] = useState({ tema:"", deliberacoes:"", responsavel:"", prazo:"", observacao:"" })
   const [loading, setLoading] = useState(true)
 
@@ -26,9 +30,9 @@ export default function AtasPage() {
     setLoading(false)
   }
 
-  const getItems = (mid) => items.filter((i) => i.minute_id === mid)
-  const toggleExpand = (id) => setExpanded((prev) => { const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n })
-  const fmtDate = (d) => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : ""
+  const getItems = (mid: string) => items.filter((i) => i.minute_id === mid)
+  const toggleExpand = (id: string) => setExpanded((prev) => { const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n })
+  const fmtDate = (d: string) => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : ""
 
   async function createMinute() {
     if (!newMinute.title.trim()) return
@@ -37,7 +41,7 @@ export default function AtasPage() {
     setShowNew(false); setNewMinute({ project_id:"", title:"" })
   }
 
-  async function addItem(mid) {
+  async function addItem(mid: string) {
     if (!newItem.tema.trim()) return
     const { data } = await supabase.from("minute_items").insert({
       minute_id:mid, tema:newItem.tema, deliberacoes:newItem.deliberacoes||null,
@@ -47,12 +51,12 @@ export default function AtasPage() {
     setAddingItem(null); setNewItem({ tema:"", deliberacoes:"", responsavel:"", prazo:"", observacao:"" })
   }
 
-  async function deleteItem(id) {
+  async function deleteItem(id: string) {
     await supabase.from("minute_items").delete().eq("id", id)
     setItems((prev) => prev.filter((i) => i.id!==id))
   }
 
-  async function deleteMinute(id) {
+  async function deleteMinute(id: string) {
     if (!confirm("Excluir esta ata?")) return
     await supabase.from("minute_items").delete().eq("minute_id", id)
     await supabase.from("minutes").delete().eq("id", id)
