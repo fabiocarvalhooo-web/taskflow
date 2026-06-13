@@ -30,7 +30,7 @@ export async function POST() {
     }).join("")
 
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:-apple-system,sans-serif;color:#1a1a1a;max-width:700px;margin:0 auto;padding:20px">
-<h1 style="font-size:22px;font-weight:700;margin-bottom:4px">Agenda de Trabalho</h1>
+<h1 style="font-size:22px;font-weight:700;margin-bottom:4px">Rumo</h1>
 <p style="color:#666;font-size:14px;margin-bottom:24px">${today}</p>
 <table style="width:100%;border-collapse:collapse;margin-bottom:28px">
 <tr>
@@ -53,7 +53,7 @@ ${overdue.length>0?`<h2 style="font-size:16px;font-weight:700;margin:0 0 12px">T
     const res = await fetch("https://api.resend.com/emails", {
       method:"POST",
       headers:{ "Authorization":`Bearer ${key}`, "Content-Type":"application/json" },
-      body:JSON.stringify({ from:"Agenda de Trabalho <onboarding@resend.dev>", to:["fabiocarvalhooo@gmail.com","f.santoscarvalho@icloud.com"], subject:`Relatorio Semanal - ${today}`, html })
+      body:JSON.stringify({ from:"Rumo <onboarding@resend.dev>", to:["fabiocarvalhooo@gmail.com","f.santoscarvalho@icloud.com"], subject:`Relatorio Semanal - ${today}`, html })
     })
 
     if (!res.ok) { const e = await res.json(); return NextResponse.json({ error:e.message }, { status:500 }) }
