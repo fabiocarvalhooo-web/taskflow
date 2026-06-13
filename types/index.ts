@@ -4,24 +4,22 @@ export interface Project {
   description?: string
   color?: string
   area?: string
-  visibility?: string
   owner_id?: string
   created_at: string
   updated_at: string
-  tasks?: Task[]
 }
 export interface Task {
   id: string
   project_id: string
   title: string
-  description?: string
-  status: 'pending' | 'completed'
-  priority: 'Alta' | 'Media' | 'Baixa'
+  status: string
+  priority: string
   due_date?: string
   responsible_name?: string
   responsible_email?: string
   note?: string
   final_decision?: string
+  created_by?: string
   created_at: string
   updated_at: string
 }
@@ -31,7 +29,6 @@ export interface Minute {
   title: string
   created_at: string
   updated_at: string
-  items?: MinuteItem[]
 }
 export interface MinuteItem {
   id: string

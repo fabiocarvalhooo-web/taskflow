@@ -2,66 +2,76 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import Nav from "@/components/Nav"
-
-interface Project { id: string; name: string; color?: string }
-interface Minute { id: string; project_id: string; title: string; created_at: string }
-interface MinuteItem { id: string; minute_id: string; tema: string; deliberacoes?: string; responsavel?: string; prazo?: string; observacao?: string; created_at: string }
+import Toast from "@/components/Toast"
 
 export default function AtasPage() {
-  const [projects, setProjects] = useState<Project[]>([])
-  const [minutes, setMinutes] = useState<Minute[]>([])
-  const [items, setItems] = useState<MinuteItem[]>([])
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [projects, setProjects] = useState([])
+  const [minutes, setMinutes] = useState([])
+  const [items, setItems] = useState([])
+  const [expanded, setExpanded] = useState(new Set())
   const [showNew, setShowNew] = useState(false)
-  const [newMinute, setNewMinute] = useState({ project_id:"", title:"" })
-  const [addingItem, setAddingItem] = useState<string|null>(null)
-  const [newItem, setNewItem] = useState({ tema:"", deliberacoes:"", responsavel:"", prazo:"", observacao:"" })
+  const [newMinute, setNewMinute] = useState({project_id:"",title:""})
+  const [addingItem, setAddingItem] = useState(null)
+  const [newItem, setNewItem] = useState({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:""})
   const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState(null)
 
-  useEffect(() => { loadData() }, [])
+  useEffect(()=>{loadData()},[])
 
   async function loadData() {
-    const [{ data: proj }, { data: min }, { data: itm }] = await Promise.all([
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { window.location.href="/login"; return }
+    const [{ data: proj },{ data: min },{ data: itm }] = await Promise.all([
       supabase.from("projects").select("*").order("name"),
-      supabase.from("minutes").select("*").order("created_at", { ascending:false }),
+      supabase.from("minutes").select("*").order("created_at",{ascending:false}),
       supabase.from("minute_items").select("*").order("created_at"),
     ])
     setProjects(proj||[]); setMinutes(min||[]); setItems(itm||[])
     setLoading(false)
   }
 
-  const getItems = (mid: string) => items.filter((i) => i.minute_id === mid)
-  const toggleExpand = (id: string) => setExpanded((prev) => { const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n })
-  const fmtDate = (d: string) => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : ""
+  const getItems = (mid) => items.filter((i)=>i.minute_id===mid)
+  const toggleExpand = (id) => setExpanded((prev)=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n})
+  const fmtDate = (d) => d?new Date(d+"T12:00:00").toLocaleDateString("pt-BR"):""
+  const showToast = (message, type="success") => setToast({message,type})
 
   async function createMinute() {
-    if (!newMinute.title.trim()) return
-    const { data } = await supabase.from("minutes").insert({ project_id:newMinute.project_id||null, title:newMinute.title }).select().single()
-    if (data) { setMinutes((prev) => [data, ...prev]); setExpanded((prev) => new Set([...prev, data.id])) }
-    setShowNew(false); setNewMinute({ project_id:"", title:"" })
+    if (!newMinute.title.trim()) { showToast("Informe o titulo da ata.","error"); return }
+    const { data, error } = await supabase.from("minutes").insert({project_id:newMinute.project_id||null,title:newMinute.title}).select().single()
+    if (error) { showToast("Erro ao criar ata.","error"); return }
+    setMinutes((prev)=>[data,...prev])
+    setExpanded((prev)=>new Set([...prev,data.id]))
+    setShowNew(false); setNewMinute({project_id:"",title:""})
+    showToast("Ata criada!")
   }
 
-  async function addItem(mid: string) {
-    if (!newItem.tema.trim()) return
-    const { data } = await supabase.from("minute_items").insert({
+  async function addItem(mid) {
+    if (!newItem.tema.trim()) { showToast("Informe o tema.","error"); return }
+    const { data, error } = await supabase.from("minute_items").insert({
       minute_id:mid, tema:newItem.tema, deliberacoes:newItem.deliberacoes||null,
       responsavel:newItem.responsavel||null, prazo:newItem.prazo||null, observacao:newItem.observacao||null
     }).select().single()
-    if (data) setItems((prev) => [...prev, data])
-    setAddingItem(null); setNewItem({ tema:"", deliberacoes:"", responsavel:"", prazo:"", observacao:"" })
+    if (error) { showToast("Erro ao adicionar item.","error"); return }
+    setItems((prev)=>[...prev,data])
+    setAddingItem(null); setNewItem({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:""})
+    showToast("Item adicionado!")
   }
 
-  async function deleteItem(id: string) {
-    await supabase.from("minute_items").delete().eq("id", id)
-    setItems((prev) => prev.filter((i) => i.id!==id))
+  async function deleteItem(id) {
+    const { error } = await supabase.from("minute_items").delete().eq("id",id)
+    if (error) { showToast("Erro ao excluir.","error"); return }
+    setItems((prev)=>prev.filter((i)=>i.id!==id))
+    showToast("Item excluido.")
   }
 
-  async function deleteMinute(id: string) {
-    if (!confirm("Excluir esta ata?")) return
-    await supabase.from("minute_items").delete().eq("minute_id", id)
-    await supabase.from("minutes").delete().eq("id", id)
-    setMinutes((prev) => prev.filter((m) => m.id!==id))
-    setItems((prev) => prev.filter((i) => i.minute_id!==id))
+  async function deleteMinute(id) {
+    if (!confirm("Excluir esta ata e todos os itens?")) return
+    await supabase.from("minute_items").delete().eq("minute_id",id)
+    const { error } = await supabase.from("minutes").delete().eq("id",id)
+    if (error) { showToast("Erro ao excluir ata.","error"); return }
+    setMinutes((prev)=>prev.filter((m)=>m.id!==id))
+    setItems((prev)=>prev.filter((i)=>i.minute_id!==id))
+    showToast("Ata excluida.")
   }
 
   if (loading) return <><Nav /><div className="loading">Carregando...</div></>
@@ -71,23 +81,18 @@ export default function AtasPage() {
       <Nav />
       <div className="page-wrapper">
         <div className="header">
-          <div>
-            <h1>Atas de Reuniao</h1>
-            <div className="date">{new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
-          </div>
+          <div><h1>Atas de Reuniao</h1><div className="date">{new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div></div>
           <button className="btn-primary" onClick={()=>setShowNew(true)}>+ Nova Ata</button>
         </div>
-        {minutes.length===0 && <div className="empty"><p>Nenhuma ata ainda.</p><p style={{marginTop:8}}>Clique em + Nova Ata para comecar.</p></div>}
-        {minutes.map((minute) => {
-          const mi = getItems(minute.id)
-          const proj = projects.find((p) => p.id===minute.project_id)
-          const isOpen = expanded.has(minute.id)
+        {minutes.length===0&&<div className="empty"><p>Nenhuma ata ainda.</p><p style={{marginTop:8}}>Clique em + Nova Ata para comecar.</p></div>}
+        {minutes.map((minute)=>{
+          const mi=getItems(minute.id); const proj=projects.find((p)=>p.id===minute.project_id); const isOpen=expanded.has(minute.id)
           return (
             <div key={minute.id} className="ata-card">
               <div className="ata-header" onClick={()=>toggleExpand(minute.id)}>
                 <div>
                   <h3>{minute.title}</h3>
-                  {proj && <div style={{fontSize:12,color:"#6b7280",marginTop:2}}>Projeto: {proj.name}</div>}
+                  {proj&&<div style={{fontSize:12,color:"#6b7280",marginTop:2}}>📁 {proj.name}</div>}
                   <div style={{fontSize:12,color:"#9ca3af",marginTop:2}}>{new Date(minute.created_at).toLocaleDateString("pt-BR")} · {mi.length} {mi.length===1?"item":"itens"}</div>
                 </div>
                 <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -95,28 +100,28 @@ export default function AtasPage() {
                   <span>{isOpen?"▲":"▼"}</span>
                 </div>
               </div>
-              {isOpen && (
+              {isOpen&&(
                 <div>
-                  {mi.length > 0 && (
+                  {mi.length>0&&(
                     <div style={{overflowX:"auto"}}>
                       <table className="ata-table">
                         <thead><tr><th>Tema</th><th>Deliberacoes</th><th>Responsavel</th><th>Prazo</th><th>Observacao</th><th style={{width:40}}></th></tr></thead>
                         <tbody>
-                          {mi.map((item) => (
+                          {mi.map((item)=>(
                             <tr key={item.id}>
                               <td style={{fontWeight:500}}>{item.tema}</td>
                               <td>{item.deliberacoes||"—"}</td>
                               <td>{item.responsavel||"—"}</td>
                               <td>{item.prazo?fmtDate(item.prazo):"—"}</td>
                               <td>{item.observacao||"—"}</td>
-                              <td><button className="btn-ghost" onClick={()=>deleteItem(item.id)} style={{fontSize:12}}>🗑️</button></td>
+                              <td><button className="btn-ghost" onClick={()=>deleteItem(item.id)}>🗑️</button></td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
                   )}
-                  {addingItem===minute.id ? (
+                  {addingItem===minute.id?(
                     <div style={{padding:"16px 18px",borderTop:"1px solid var(--border)"}}>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
                         <input type="text" placeholder="Tema *" value={newItem.tema} onChange={(e)=>setNewItem((i)=>({...i,tema:e.target.value}))} autoFocus/>
@@ -132,7 +137,7 @@ export default function AtasPage() {
                         <button className="btn-primary" onClick={()=>addItem(minute.id)}>Adicionar Item</button>
                       </div>
                     </div>
-                  ) : (
+                  ):(
                     <div className="add-task-trigger" onClick={()=>{setAddingItem(minute.id);setNewItem({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:""})}}>+ Adicionar item a ata</div>
                   )}
                 </div>
@@ -140,12 +145,12 @@ export default function AtasPage() {
             </div>
           )
         })}
-        {showNew && (
+        {showNew&&(
           <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget&&setShowNew(false)}>
             <div className="modal">
               <h2>Nova Ata de Reuniao</h2>
               <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                <input type="text" placeholder="Titulo da ata" value={newMinute.title} onChange={(e)=>setNewMinute((m)=>({...m,title:e.target.value}))} autoFocus/>
+                <input type="text" placeholder="Titulo da ata *" value={newMinute.title} onChange={(e)=>setNewMinute((m)=>({...m,title:e.target.value}))} autoFocus onKeyDown={(e)=>e.key==="Enter"&&createMinute()}/>
                 <select value={newMinute.project_id} onChange={(e)=>setNewMinute((m)=>({...m,project_id:e.target.value}))}>
                   <option value="">Selecionar projeto (opcional)</option>
                   {projects.map((p)=><option key={p.id} value={p.id}>{p.name}</option>)}
@@ -158,6 +163,7 @@ export default function AtasPage() {
             </div>
           </div>
         )}
+        {toast&&<Toast message={toast.message} type={toast.type} onDone={()=>setToast(null)}/>}
       </div>
     </>
   )
