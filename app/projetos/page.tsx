@@ -9,6 +9,7 @@ const emptyForm = { title:"", priority:"Media", due_date:"", responsible_name:""
 export default function ProjetosPage() {
   const [projects, setProjects] = useState([])
   const [tasks, setTasks] = useState([])
+  const [userId, setUserId] = useState("")
   const [expanded, setExpanded] = useState(new Set())
   const [addingTask, setAddingTask] = useState(null)
   const [taskForm, setTaskForm] = useState(emptyForm)
@@ -16,13 +17,13 @@ export default function ProjetosPage() {
   const [newProject, setNewProject] = useState({ name:"", description:"", color:COLORS[0], area:"" })
   const [editTask, setEditTask] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [userId, setUserId] = useState(null)
 
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (user) setUserId(user.id)
+    const uid = user?.id || ""
+    setUserId(uid)
     const [{ data: proj }, { data: tsk }] = await Promise.all([
       supabase.from("projects").select("*").order("created_at"),
       supabase.from("tasks").select("*").order("created_at"),
@@ -45,14 +46,20 @@ export default function ProjetosPage() {
     return new Date(t.due_date) < new Date()
   }
   const fmtDate = (d) => new Date(d+"T12:00:00").toLocaleDateString("pt-BR")
-  const toggleExpand = (id) => {
-    setExpanded((prev) => { const n = new Set(prev); n.has(id)?n.delete(id):n.add(id); return n })
+  const toggleExpand = (id) => setExpanded((prev) => { const n=new Set(prev); n.has(id)?n.delete(id):n.add(id); return n })
+
+  function addToGoogleCalendar(task) {
+    if (!task.due_date) { alert("Adicione um prazo para exportar ao Google Calendar."); return }
+    const title = encodeURIComponent(task.title)
+    const date = task.due_date.replace(/-/g,"")
+    const details = encodeURIComponent(task.note||"")
+    window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}/${date}&details=${details}`,"_blank")
   }
 
   async function toggleTask(task) {
-    const s = task.status === "completed" ? "pending" : "completed"
-    await supabase.from("tasks").update({ status:s }).eq("id", task.id)
-    setTasks((prev) => prev.map((t) => t.id===task.id?{...t,status:s}:t))
+    const s = task.status==="completed"?"pending":"completed"
+    await supabase.from("tasks").update({status:s}).eq("id",task.id)
+    setTasks((prev)=>prev.map((t)=>t.id===task.id?{...t,status:s}:t))
   }
 
   async function addTask(pid) {
@@ -60,16 +67,17 @@ export default function ProjetosPage() {
     const { data } = await supabase.from("tasks").insert({
       project_id:pid, title:taskForm.title, priority:taskForm.priority,
       due_date:taskForm.due_date||null, responsible_name:taskForm.responsible_name||null,
-      responsible_email:taskForm.responsible_email||null, note:taskForm.note||null, status:"pending"
+      responsible_email:taskForm.responsible_email||null, note:taskForm.note||null, status:"pending",
+      created_by:userId
     }).select().single()
-    if (data) setTasks((prev) => [...prev, data])
+    if (data) setTasks((prev)=>[...prev,data])
     setAddingTask(null); setTaskForm(emptyForm)
   }
 
   async function deleteTask(id) {
     if (!confirm("Excluir tarefa?")) return
-    await supabase.from("tasks").delete().eq("id", id)
-    setTasks((prev) => prev.filter((t) => t.id!==id))
+    await supabase.from("tasks").delete().eq("id",id)
+    setTasks((prev)=>prev.filter((t)=>t.id!==id))
   }
 
   async function saveEdit() {
@@ -78,39 +86,31 @@ export default function ProjetosPage() {
       title:editTask.title, priority:editTask.priority, due_date:editTask.due_date||null,
       responsible_name:editTask.responsible_name||null, responsible_email:editTask.responsible_email||null,
       note:editTask.note||null, final_decision:editTask.final_decision||null
-    }).eq("id", editTask.id).select().single()
-    if (data) setTasks((prev) => prev.map((t) => t.id===data.id?data:t))
+    }).eq("id",editTask.id).select().single()
+    if (data) setTasks((prev)=>prev.map((t)=>t.id===data.id?data:t))
     setEditTask(null)
   }
 
   async function addProject() {
     if (!newProject.name.trim()) return
-    const { data } = await supabase.from("projects").insert({
+    const { data, error } = await supabase.from("projects").insert({
       name:newProject.name, description:newProject.description||null,
       color:newProject.color, area:newProject.area||null, owner_id:userId
     }).select().single()
-    if (data) { setProjects((prev) => [...prev, data]); setExpanded((prev) => new Set([...prev, data.id])) }
-    setShowNewProject(false); setNewProject({ name:"", description:"", color:COLORS[0], area:"" })
+    if (error) { alert("Erro ao criar projeto: " + error.message); return }
+    if (data) { setProjects((prev)=>[...prev,data]); setExpanded((prev)=>new Set([...prev,data.id])) }
+    setShowNewProject(false); setNewProject({name:"",description:"",color:COLORS[0],area:""})
   }
 
   async function deleteProject(id) {
     if (!confirm("Excluir projeto e todas as tarefas?")) return
-    await supabase.from("tasks").delete().eq("project_id", id)
-    await supabase.from("projects").delete().eq("id", id)
-    setProjects((prev) => prev.filter((p) => p.id!==id))
-    setTasks((prev) => prev.filter((t) => t.project_id!==id))
+    await supabase.from("tasks").delete().eq("project_id",id)
+    await supabase.from("projects").delete().eq("id",id)
+    setProjects((prev)=>prev.filter((p)=>p.id!==id))
+    setTasks((prev)=>prev.filter((t)=>t.project_id!==id))
   }
 
-
-  function addToGoogleCalendar(task) {
-    if (!task.due_date) { alert("Adicione um prazo para exportar ao Google Calendar."); return }
-    const title = encodeURIComponent(task.title)
-    const date = task.due_date.replace(/-/g, "")
-    const details = encodeURIComponent(task.note || "")
-    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}/${date}&details=${details}`
-    window.open(url, "_blank")
-  }
-  const pClass = (p) => "badge badge-" + (p==="Alta"?"alta":p==="Média"||p==="Media"?"media":"baixa")
+  const pClass = (p) => "badge badge-"+(p==="Alta"?"alta":p==="Média"||p==="Media"?"media":"baixa")
 
   if (loading) return <><Nav /><div className="loading">Carregando...</div></>
 
@@ -128,6 +128,7 @@ export default function ProjetosPage() {
         <div className="section-header">
           <h2>Projetos <span className="count">{projects.length}</span></h2>
         </div>
+        {projects.length===0 && <div className="empty"><p>Nenhum projeto ainda.</p><p style={{marginTop:8}}>Clique em + Novo Projeto para comecar.</p></div>}
         {projects.map((project) => {
           const prog = getProgress(project.id)
           const pt = getPT(project.id)
@@ -150,9 +151,9 @@ export default function ProjetosPage() {
                 </div>
               </div>
               {isOpen && <>
-                {pt.length > 0 && (
+                {pt.length>0 && (
                   <div className="tasks-list">
-                    {pt.map((task) => (
+                    {pt.map((task)=>(
                       <div key={task.id} className={"task-row"+(isOverdue(task)?" overdue":"")}>
                         <input type="checkbox" className="task-checkbox" checked={task.status==="completed"} onChange={()=>toggleTask(task)}/>
                         <div className="task-content">
@@ -169,15 +170,15 @@ export default function ProjetosPage() {
                           </div>
                         </div>
                         <div className="task-row-actions">
+                          <button className="btn-ghost" onClick={()=>addToGoogleCalendar(task)} title="Google Calendar">🗓️</button>
                           <button className="btn-ghost" onClick={()=>setEditTask(task)}>✏️</button>
-                          <button className="btn-ghost" onClick={()=>addToGoogleCalendar(task)} title="Adicionar ao Google Calendar">📅</button>
                           <button className="btn-ghost" onClick={()=>deleteTask(task.id)}>🗑️</button>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-                {addingTask===project.id ? (
+                {addingTask===project.id?(
                   <div className="add-task-form">
                     <input type="text" placeholder="Título da tarefa" value={taskForm.title} onChange={(e)=>setTaskForm((f)=>({...f,title:e.target.value}))} autoFocus onKeyDown={(e)=>e.key==="Enter"&&addTask(project.id)}/>
                     <div className="form-row">
@@ -198,14 +199,14 @@ export default function ProjetosPage() {
                       <button className="btn-primary" onClick={()=>addTask(project.id)}>Adicionar</button>
                     </div>
                   </div>
-                ) : (
+                ):(
                   <div className="add-task-trigger" onClick={()=>{setAddingTask(project.id);setTaskForm(emptyForm)}}>+ Adicionar tarefa</div>
                 )}
               </>}
             </div>
           )
         })}
-        {showNewProject && (
+        {showNewProject&&(
           <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget&&setShowNewProject(false)}>
             <div className="modal">
               <h2>Novo Projeto</h2>
@@ -215,7 +216,7 @@ export default function ProjetosPage() {
                 <input type="text" placeholder="Área (ex: UNDB, Vivo)" value={newProject.area} onChange={(e)=>setNewProject((p)=>({...p,area:e.target.value}))}/>
                 <div>
                   <div style={{fontSize:12,color:"#6b7280",marginBottom:8}}>Cor</div>
-                  <div style={{display:"flex",gap:8}}>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                     {COLORS.map((c)=>(
                       <button key={c} onClick={()=>setNewProject((p)=>({...p,color:c}))} style={{width:28,height:28,borderRadius:"50%",background:c,border:"none",cursor:"pointer",outline:newProject.color===c?`3px solid ${c}`:"none",outlineOffset:2}}/>
                     ))}
@@ -229,7 +230,7 @@ export default function ProjetosPage() {
             </div>
           </div>
         )}
-        {editTask && (
+        {editTask&&(
           <div className="modal-overlay" onClick={(e)=>e.target===e.currentTarget&&setEditTask(null)}>
             <div className="modal">
               <h2>Editar Tarefa</h2>
