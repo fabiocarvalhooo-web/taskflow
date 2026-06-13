@@ -108,7 +108,7 @@ export default function ProjetosPage() {
       <div className="page-wrapper">
         <div className="header">
           <div>
-            <h1>Agenda de Trabalho</h1>
+            <h1>Rumo</h1>
             <div className="date">{new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div>
           </div>
           <button className="btn-primary" onClick={()=>setShowNewProject(true)}>+ Novo Projeto</button>

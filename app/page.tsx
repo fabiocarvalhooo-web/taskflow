@@ -58,7 +58,7 @@ export default function Dashboard() {
       <div className="page-wrapper">
         <div className="header">
           <div>
-            <h1>Agenda de Trabalho</h1>
+            <h1>Rumo</h1>
             <div className="date">{todayStr}</div>
           </div>
           <button className="btn-primary" onClick={sendStatus}>✉️ Enviar Status Atual</button>

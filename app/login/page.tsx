@@ -28,7 +28,7 @@ export default function LoginPage() {
   return (
     <div style={{minHeight:"100vh",background:"#f3f4f6",display:"flex",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"-apple-system,sans-serif"}}>
       <div style={{background:"white",borderRadius:12,padding:32,width:"100%",maxWidth:400,boxShadow:"0 4px 24px rgba(0,0,0,0.08)"}}>
-        <h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Agenda de Trabalho</h1>
+        <h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Rumo</h1>
         <p style={{color:"#6b7280",fontSize:14,marginBottom:28}}>{isSignUp?"Criar nova conta":"Entrar na sua conta"}</p>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} style={{padding:"10px 14px",border:"1px solid #e5e7eb",borderRadius:8,fontSize:14,outline:"none"}}/>
