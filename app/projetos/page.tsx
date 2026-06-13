@@ -98,6 +98,15 @@ export default function ProjetosPage() {
     setTasks((prev) => prev.filter((t) => t.project_id!==id))
   }
 
+
+  function addToGoogleCalendar(task) {
+    if (!task.due_date) { alert("Adicione um prazo para exportar ao Google Calendar."); return }
+    const title = encodeURIComponent(task.title)
+    const date = task.due_date.replace(/-/g, "")
+    const details = encodeURIComponent(task.note || "")
+    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}/${date}&details=${details}`
+    window.open(url, "_blank")
+  }
   const pClass = (p) => "badge badge-" + (p==="Alta"?"alta":p==="Média"||p==="Media"?"media":"baixa")
 
   if (loading) return <><Nav /><div className="loading">Carregando...</div></>
@@ -158,6 +167,7 @@ export default function ProjetosPage() {
                         </div>
                         <div className="task-row-actions">
                           <button className="btn-ghost" onClick={()=>setEditTask(task)}>✏️</button>
+                          <button className="btn-ghost" onClick={()=>addToGoogleCalendar(task)} title="Adicionar ao Google Calendar">📅</button>
                           <button className="btn-ghost" onClick={()=>deleteTask(task.id)}>🗑️</button>
                         </div>
                       </div>
