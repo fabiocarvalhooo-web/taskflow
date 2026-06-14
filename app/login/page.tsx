@@ -34,8 +34,8 @@ export default function LoginPage() {
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <input type="email" placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} style={{padding:"10px 14px",border:"1px solid #e5e7eb",borderRadius:8,fontSize:14,outline:"none"}}/>
           <input type="password" placeholder="Senha (minimo 6 caracteres)" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} style={{padding:"10px 14px",border:"1px solid #e5e7eb",borderRadius:8,fontSize:14,outline:"none"}}/>
-          {error and <div style={{color:"#ef4444",fontSize:13,background:"#fef2f2",padding:"10px 12px",borderRadius:6}}>{error}</div>}
-          {msg and <div style={{color:"#16a34a",fontSize:13,background:"#f0fdf4",padding:"10px 12px",borderRadius:6}}>{msg}</div>}
+          {error && <div style={{color:"#ef4444",fontSize:13,background:"#fef2f2",padding:"10px 12px",borderRadius:6}}>{error}</div>}
+          {msg && <div style={{color:"#16a34a",fontSize:13,background:"#f0fdf4",padding:"10px 12px",borderRadius:6}}>{msg}</div>}
           <button onClick={handle} disabled={loading} style={{background:"#3b82f6",color:"white",border:"none",borderRadius:8,padding:12,fontSize:14,fontWeight:600,cursor:"pointer"}}>
             {loading?"Aguarde...":(isSignUp?"Criar Conta":"Entrar")}
           </button>
