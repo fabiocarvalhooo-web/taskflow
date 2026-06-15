@@ -10,17 +10,19 @@ export default function AtasPage() {
   const [items, setItems] = useState([])
   const [expanded, setExpanded] = useState(new Set())
   const [addingItem, setAddingItem] = useState(null)
-  const [newItem, setNewItem] = useState({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:""})
+  const [newItem, setNewItem] = useState({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:"",task_project_id:""})
   const [showNew, setShowNew] = useState(false)
   const [newMinute, setNewMinute] = useState({project_id:"",title:""})
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
+  const [userId, setUserId] = useState("")
 
   useEffect(()=>{ loadData() },[])
 
   async function loadData() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { window.location.href="/login"; return }
+    setUserId(user.id)
     const [{ data: proj },{ data: min },{ data: itm }] = await Promise.all([
       supabase.from("projects").select("*").order("name"),
       supabase.from("minutes").select("*").order("created_at",{ascending:false}),
@@ -39,27 +41,48 @@ export default function AtasPage() {
     if (!newMinute.title.trim()) { showToast("Informe o titulo da ata.","error"); return }
     const { data, error } = await supabase.from("minutes").insert({
       project_id: newMinute.project_id || null,
-      title: newMinute.title
+      title: newMinute.title,
+      created_by: userId
     }).select().single()
     if (error) { showToast("Erro ao criar ata: "+error.message,"error"); return }
     setMinutes((prev)=>[data,...prev])
     setExpanded((prev)=>new Set([...prev,data.id]))
     setAddingItem(data.id)
-    setNewItem({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:""})
+    setNewItem({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:"",task_project_id:""})
     setShowNew(false); setNewMinute({project_id:"",title:""})
     showToast("Ata criada!")
   }
 
   async function addItem(mid) {
     if (!newItem.tema.trim()) { showToast("Informe o tema.","error"); return }
+    const minute = minutes.find((m)=>m.id===mid)
+    const targetProjectId = (minute && minute.project_id) || newItem.task_project_id || null
+
+    let taskId = null
+    if (targetProjectId) {
+      const { data: taskData, error: taskError } = await supabase.from("tasks").insert({
+        project_id: targetProjectId,
+        title: newItem.tema,
+        status: "pending",
+        priority: "Média",
+        due_date: newItem.prazo || null,
+        responsible_name: newItem.responsavel || null,
+        note: newItem.deliberacoes || null,
+        created_by: userId
+      }).select().single()
+      if (taskError) { showToast("Erro ao criar tarefa: "+taskError.message,"error"); return }
+      taskId = taskData.id
+    }
+
     const { data, error } = await supabase.from("minute_items").insert({
       minute_id:mid, tema:newItem.tema, deliberacoes:newItem.deliberacoes||null,
-      responsavel:newItem.responsavel||null, prazo:newItem.prazo||null, observacao:newItem.observacao||null
+      responsavel:newItem.responsavel||null, prazo:newItem.prazo||null, observacao:newItem.observacao||null,
+      task_id: taskId
     }).select().single()
     if (error) { showToast("Erro ao adicionar item: "+error.message,"error"); return }
     setItems((prev)=>[...prev,data])
-    setNewItem({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:""})
-    showToast("Item adicionado!")
+    setNewItem({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:"",task_project_id:""})
+    showToast(taskId ? "Item adicionado e tarefa criada no projeto!" : "Item adicionado!")
   }
 
   async function deleteItem(id) {
@@ -146,7 +169,10 @@ export default function AtasPage() {
                             <tbody>
                               {mi.map((item)=>(
                                 <tr key={item.id}>
-                                  <td style={{fontWeight:500}}>{item.tema}</td>
+                                  <td style={{fontWeight:500}}>
+                                    {item.tema}
+                                    {item.task_id && <span className="badge badge-decision" style={{marginLeft:6}}>📋 tarefa</span>}
+                                  </td>
                                   <td>{item.deliberacoes||"—"}</td>
                                   <td>{item.responsavel||"—"}</td>
                                   <td>{item.prazo?fmtDate(item.prazo):"—"}</td>
@@ -169,13 +195,23 @@ export default function AtasPage() {
                             <textarea placeholder="Deliberacoes" rows={2} value={newItem.deliberacoes} onChange={(e)=>setNewItem((i)=>({...i,deliberacoes:e.target.value}))}/>
                             <textarea placeholder="Observacao" rows={2} value={newItem.observacao} onChange={(e)=>setNewItem((i)=>({...i,observacao:e.target.value}))}/>
                           </div>
+                          {minute.project_id ? (
+                            <div style={{fontSize:12,color:"#6b7280",marginBottom:10}}>
+                              ✅ Este item vai gerar uma tarefa no projeto <strong>{group.project?.name}</strong>
+                            </div>
+                          ) : (
+                            <select value={newItem.task_project_id} onChange={(e)=>setNewItem((i)=>({...i,task_project_id:e.target.value}))} style={{marginBottom:10}}>
+                              <option value="">Nao criar tarefa</option>
+                              {projects.map((p)=><option key={p.id} value={p.id}>Criar tarefa em: {p.name}</option>)}
+                            </select>
+                          )}
                           <div className="form-actions">
                             <button className="btn-secondary" onClick={()=>setAddingItem(null)}>Fechar</button>
                             <button className="btn-primary" onClick={()=>addItem(minute.id)}>Adicionar Item</button>
                           </div>
                         </div>
                       ) : (
-                        <div className="add-task-trigger" onClick={()=>{setAddingItem(minute.id);setNewItem({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:""})}}>+ Adicionar item a ata</div>
+                        <div className="add-task-trigger" onClick={()=>{setAddingItem(minute.id);setNewItem({tema:"",deliberacoes:"",responsavel:"",prazo:"",observacao:"",task_project_id:""})}}>+ Adicionar item a ata</div>
                       )}
                     </div>
                   )}
