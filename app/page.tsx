@@ -7,6 +7,8 @@ export default function Dashboard() {
   const [projects, setProjects] = useState([])
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState("week")
+  const [expanded, setExpanded] = useState(new Set())
 
   useEffect(() => { loadData() }, [])
 
@@ -21,6 +23,9 @@ export default function Dashboard() {
     setLoading(false)
   }
 
+  const toggleExpand = (id) => setExpanded((prev)=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n})
+  const fmtDateTime = (d) => d?new Date(d).toLocaleDateString("pt-BR"):""
+
   const today = new Date()
   const todayStr = today.toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long",year:"numeric"})
   const completed = tasks.filter((t) => t.status==="completed")
@@ -34,6 +39,20 @@ export default function Dashboard() {
   const ew = new Date(sw); ew.setDate(sw.getDate()+6)
   const week = tasks.filter((t) => { if (!t.due_date) return false; const d=new Date(t.due_date); return d>=sw&&d<=ew })
   const dotColor = (p) => p==="Alta"?"#ef4444":p==="Media"||p==="Média"?"#f59e0b":"#22c55e"
+
+  const startOfWeek = new Date(today); startOfWeek.setDate(today.getDate()-today.getDay()); startOfWeek.setHours(0,0,0,0)
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+  const filteredCompleted = completed.filter((t)=>{
+    if (period==="all") return true
+    if (!t.completed_at) return false
+    const d = new Date(t.completed_at)
+    if (period==="today") return d.toDateString()===today.toDateString()
+    if (period==="week") return d>=startOfWeek
+    if (period==="month") return d>=startOfMonth
+    return true
+  }).sort((a,b)=> new Date(b.completed_at||b.created_at).getTime() - new Date(a.completed_at||a.created_at).getTime())
+
+  const pClass = (p) => "badge badge-"+(p==="Alta"?"alta":p==="Baixa"?"baixa":"media")
 
   if (loading) return <><Nav /><div className="loading">Carregando...</div></>
 
@@ -92,6 +111,56 @@ export default function Dashboard() {
           <div className="empty">
             <p style={{fontSize:16,marginBottom:8}}>Bem-vindo ao Rumo! 🎯</p>
             <p>Comece criando seu primeiro projeto em <a href="/projetos" style={{color:"#3b82f6"}}>Projetos</a>.</p>
+          </div>
+        )}
+
+        {completed.length>0 && (
+          <div style={{marginTop:28}}>
+            <div className="section-header">
+              <h2>Tarefas Concluidas <span className="count">{filteredCompleted.length}</span></h2>
+              <select value={period} onChange={(e)=>setPeriod(e.target.value)} style={{width:"auto"}}>
+                <option value="today">Hoje</option>
+                <option value="week">Esta semana</option>
+                <option value="month">Este mes</option>
+                <option value="all">Todas</option>
+              </select>
+            </div>
+            <div className="project-card">
+              <div className="tasks-list" style={{borderTop:"none"}}>
+                {filteredCompleted.length===0 && <div className="empty" style={{padding:24}}>Nenhuma tarefa concluida nesse periodo.</div>}
+                {filteredCompleted.map((task)=>{
+                  const proj = projects.find((p)=>p.id===task.project_id)
+                  const isOpen = expanded.has(task.id)
+                  return (
+                    <div key={task.id} className="task-row" style={{cursor:"pointer",flexDirection:"column",alignItems:"stretch"}} onClick={()=>toggleExpand(task.id)}>
+                      <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                        <span style={{marginTop:2}}>✅</span>
+                        <div className="task-content">
+                          <div className="task-title done">{task.title}</div>
+                          <div className="task-badges">
+                            <span className={pClass(task.priority)}>{task.priority}</span>
+                            {proj && <span className="badge badge-date">📁 {proj.name}</span>}
+                            {task.completed_at && <span className="badge badge-date">✅ {fmtDateTime(task.completed_at)}</span>}
+                            {task.final_decision && <span className="badge badge-decision">⚖️ decisao</span>}
+                          </div>
+                        </div>
+                        <span style={{color:"#9ca3af",fontSize:12}}>{isOpen?"▲":"▼"}</span>
+                      </div>
+                      {isOpen && (
+                        <div style={{marginTop:10,marginLeft:28,fontSize:13,color:"#4b5563"}}>
+                          {task.note && <div style={{marginBottom:6}}><strong>Nota:</strong> {task.note}</div>}
+                          {task.final_decision ? (
+                            <div><strong>Decisao final:</strong> {task.final_decision}</div>
+                          ) : (
+                            <div style={{color:"#9ca3af"}}>Sem decisao final registrada.</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>

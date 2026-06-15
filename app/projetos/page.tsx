@@ -57,9 +57,10 @@ export default function ProjetosPage() {
 
   async function toggleTask(task) {
     const s = task.status==="completed"?"pending":"completed"
-    const { error } = await supabase.from("tasks").update({status:s}).eq("id",task.id)
-    if (error) { showToast("Erro ao atualizar tarefa.","error"); return }
-    setTasks((prev)=>prev.map((t)=>t.id===task.id?{...t,status:s}:t))
+    const completedAt = s==="completed" ? new Date().toISOString() : null
+    const { error } = await supabase.from("tasks").update({status:s, completed_at: completedAt}).eq("id",task.id)
+    if (error) { showToast("Erro ao atualizar tarefa: "+error.message,"error"); return }
+    setTasks((prev)=>prev.map((t)=>t.id===task.id?{...t,status:s,completed_at:completedAt}:t))
   }
 
   async function addTask(pid) {
