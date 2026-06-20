@@ -37,7 +37,7 @@ export default function ProjetosPage() {
     setLoading(false)
   }
 
-  const getPT = (pid) => tasks.filter((t)=>t.project_id===pid)
+  const getPT = (pid) => tasks.filter((t)=>t.project_id===pid&&t.status!=="completed")
   const getProgress = (pid) => {
     const pt = getPT(pid); if (!pt.length) return {done:0,total:0,pct:0}
     const done = pt.filter((t)=>t.status==="completed").length
